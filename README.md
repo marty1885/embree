@@ -18,6 +18,9 @@ processor and may not wotk on an 32bit ARM processor, also, NEON is required
 to have this project running. Also, this project won't compile on a x86
 targeted compilation.
 
+## Contributing
+Contributing is welcomed on this repository. Feel free to contribute to this project. Please fork this repository and open a pull request to add new features/fix bugs.
+
 Embree Overview
 ===============
 
