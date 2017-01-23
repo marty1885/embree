@@ -1,5 +1,22 @@
-% Embree: High Performance Ray Tracing Kernels 2.13.0
-% Intel Corporation
+embree-arm
+===============
+
+Embree arm is a hacked version of Intel's embree ray casting library
+ported to ARM using SSE2NEON and a lot of nasty hacks. The code hasn't
+been carefully analysed to proof that is works perfectly. Use it at
+your own risk.
+
+## How to build
+Please install all dependencies as a normal Embree build required. Then
+run CMake as the following. You may add other flags as you need.
+```CMake
+cmake -DEMBREE_ISPC_SUPPORT=off -DEMBREE_MAX_ISA=SSE2 .
+```
+
+Plesae note that this port has only been built on a 64 bit ARM Cortex A53
+processor and may not wotk on an 32bit ARM processor, also, NEON is required
+to have this project running. Also, this project won't compile on a x86
+targeted compilation.
 
 Embree Overview
 ===============
