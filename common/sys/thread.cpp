@@ -19,7 +19,8 @@
 #include "string.h"
 
 #include <iostream>
-#include <xmmintrin.h>
+//#include <xmmintrin.h>
+#include "../math/SSE2NEON.h"
 
 #if defined(PTHREADS_WIN32)
 #pragma comment (lib, "pthreadVC.lib")

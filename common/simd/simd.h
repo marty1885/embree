@@ -17,6 +17,8 @@
 #pragma once
 
 #include "../math/math.h"
+//#include "varying.h"
+const static int VSIZEX=4;
 
 /* include SSE wrapper classes */
 #if defined(__SSE__)

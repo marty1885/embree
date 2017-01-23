@@ -84,40 +84,13 @@ namespace embree
 
   std::string getCPUVendor()
   {
-    int cpuinfo[4]; 
-    __cpuid (cpuinfo, 0); 
-    int name[4];
-    name[0] = cpuinfo[1];
-    name[1] = cpuinfo[3];
-    name[2] = cpuinfo[2];
-    name[3] = 0;
-    return (char*)name;
+    return "ARM ARM ARM ";
   }
 
   CPUModel getCPUModel() 
   {
-    int out[4];
-    __cpuid(out, 0);
-    if (out[0] < 1) return CPU_UNKNOWN;
-    __cpuid(out, 1);
-    int family = ((out[0] >> 8) & 0x0F) + ((out[0] >> 20) & 0xFF);
-    int model  = ((out[0] >> 4) & 0x0F) | ((out[0] >> 12) & 0xF0);
-    if (family ==  11) return CPU_KNC;
-    if (family !=   6) return CPU_UNKNOWN;           // earlier than P6
-    if (model == 0x0E) return CPU_CORE1;             // Core 1
-    if (model == 0x0F) return CPU_CORE2;             // Core 2, 65 nm
-    if (model == 0x16) return CPU_CORE2;             // Core 2, 65 nm Celeron
-    if (model == 0x17) return CPU_CORE2;             // Core 2, 45 nm
-    if (model == 0x1A) return CPU_CORE_NEHALEM;      // Core i7, Nehalem
-    if (model == 0x1E) return CPU_CORE_NEHALEM;      // Core i7
-    if (model == 0x1F) return CPU_CORE_NEHALEM;      // Core i7
-    if (model == 0x2C) return CPU_CORE_NEHALEM;      // Core i7, Xeon
-    if (model == 0x2E) return CPU_CORE_NEHALEM;      // Core i7, Xeon
-    if (model == 0x2A) return CPU_CORE_SANDYBRIDGE;  // Core i7, SandyBridge
-    if (model == 0x2D) return CPU_CORE_SANDYBRIDGE;  // Core i7, SandyBridge
-    if (model == 0x45) return CPU_HASWELL;           // Haswell
-    if (model == 0x3C) return CPU_HASWELL;           // Haswell
-    return CPU_UNKNOWN;
+    return CPU_ARM;
+
   }
 
   std::string stringOfCPUModel(CPUModel model)
@@ -175,108 +148,11 @@ namespace embree
   
   /* cpuid[eax=7,ecx=0].ecx */
   static const int CPU_FEATURE_BIT_AVX512VBMI = 1 << 1;   // AVX512VBMI (vector bit manipulation instructions)
-
-  __noinline int64_t get_xcr0() 
-  {
-#if defined (__WIN32__)
-    int64_t xcr0 = 0; // int64_t is workaround for compiler bug under VS2013, Win32
-#if defined(__INTEL_COMPILER) 
-    xcr0 = _xgetbv(0);
-#elif (defined(_MSC_VER) && (_MSC_FULL_VER >= 160040219)) // min VS2010 SP1 compiler is required
-    xcr0 = _xgetbv(0); 
-#else
-#pragma message ("WARNING: AVX not supported by your compiler.")
-    xcr0 = 0;
-#endif
-    return xcr0;
-
-#else
-
-    int xcr0 = 0;
-#if defined(__INTEL_COMPILER) 
-    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
-#elif ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)) && (!defined(__MACOSX__) || defined(__TARGET_AVX__) || defined(__TARGET_AVX2__))
-    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
-#elif ((__clang_major__ > 3) || (__clang_major__ == 3 && __clang_minor__ >= 1))
-    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
-#else
-#pragma message ("WARNING: AVX not supported by your compiler.")
-    xcr0 = 0;
-#endif
-    return xcr0;
-#endif
-  }
+  static const int CPU_FEATURE_BIT_NEON = 1 << 10;
 
   int getCPUFeatures()
   {
-    /* cache CPU features access */
-    static int cpu_features = 0;
-    if (cpu_features) 
-      return cpu_features;
-
-    /* get number of CPUID leaves */
-    int cpuid_leaf0[4]; 
-    __cpuid(cpuid_leaf0, 0x00000000);
-    unsigned nIds = cpuid_leaf0[EAX];  
-
-    /* get number of extended CPUID leaves */
-    int cpuid_leafe[4]; 
-    __cpuid(cpuid_leafe, 0x80000000);
-    unsigned nExIds = cpuid_leafe[EAX];
-
-    /* get CPUID leaves for EAX = 1,7, and 0x80000001 */
-    int cpuid_leaf_1[4] = { 0,0,0,0 };
-    int cpuid_leaf_7[4] = { 0,0,0,0 };
-    int cpuid_leaf_e1[4] = { 0,0,0,0 };
-    if (nIds >= 1) __cpuid (cpuid_leaf_1,0x00000001);
-#if _WIN32
-#if _MSC_VER && (_MSC_FULL_VER < 160040219)
-#else
-    if (nIds >= 7) __cpuidex(cpuid_leaf_7,0x00000007,0);
-#endif
-#else
-    if (nIds >= 7) __cpuid_count(cpuid_leaf_7,0x00000007,0);
-#endif
-    if (nExIds >= 0x80000001) __cpuid(cpuid_leaf_e1,0x80000001);
-
-    /* detect if OS saves XMM, YMM, and ZMM states */
-    bool xmm_enabled = true;
-    bool ymm_enabled = false;
-    bool zmm_enabled = false;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_OXSAVE) {
-      int64_t xcr0 = get_xcr0();
-      xmm_enabled = ((xcr0 & 0x02) == 0x02);                /* checks if xmm are enabled in XCR0 */
-      ymm_enabled = xmm_enabled && ((xcr0 & 0x04) == 0x04); /* checks if ymm state are enabled in XCR0 */
-      zmm_enabled = ymm_enabled && ((xcr0 & 0xE0) == 0xE0); /* checks if OPMASK state, upper 256-bit of ZMM0-ZMM15 and ZMM16-ZMM31 state are enabled in XCR0 */
-    }
-    
-    if (xmm_enabled && cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE   ) cpu_features |= CPU_FEATURE_SSE;
-    if (xmm_enabled && cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE2  ) cpu_features |= CPU_FEATURE_SSE2;
-    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE3  ) cpu_features |= CPU_FEATURE_SSE3;
-    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSSE3 ) cpu_features |= CPU_FEATURE_SSSE3;
-    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_1) cpu_features |= CPU_FEATURE_SSE41;
-    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_2) cpu_features |= CPU_FEATURE_SSE42;
-    if (               cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_POPCNT) cpu_features |= CPU_FEATURE_POPCNT;
-    if (ymm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_AVX   ) cpu_features |= CPU_FEATURE_AVX;
-    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_F16C  ) cpu_features |= CPU_FEATURE_F16C;
-    if (               cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_RDRAND) cpu_features |= CPU_FEATURE_RDRAND;
-    if (ymm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX2  ) cpu_features |= CPU_FEATURE_AVX2;
-    if (ymm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_FMA3  ) cpu_features |= CPU_FEATURE_FMA3;
-    if (cpuid_leaf_e1[ECX] & CPU_FEATURE_BIT_LZCNT) cpu_features |= CPU_FEATURE_LZCNT;
-    if (cpuid_leaf_7 [EBX] & CPU_FEATURE_BIT_BMI1 ) cpu_features |= CPU_FEATURE_BMI1;
-    if (cpuid_leaf_7 [EBX] & CPU_FEATURE_BIT_BMI2 ) cpu_features |= CPU_FEATURE_BMI2;
-
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512F   ) cpu_features |= CPU_FEATURE_AVX512F;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512DQ  ) cpu_features |= CPU_FEATURE_AVX512DQ;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512PF  ) cpu_features |= CPU_FEATURE_AVX512PF;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512ER  ) cpu_features |= CPU_FEATURE_AVX512ER; 
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512CD  ) cpu_features |= CPU_FEATURE_AVX512CD;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512BW  ) cpu_features |= CPU_FEATURE_AVX512BW;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512IFMA) cpu_features |= CPU_FEATURE_AVX512IFMA;
-    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512VL  ) cpu_features |= CPU_FEATURE_AVX512VL;
-    if (zmm_enabled && cpuid_leaf_7[ECX] & CPU_FEATURE_BIT_AVX512VBMI) cpu_features |= CPU_FEATURE_AVX512VBMI;
-
-    return cpu_features;
+     return CPU_FEATURE_NEON|CPU_FEATURE_SSE2|CPU_FEATURE_SSE;
   }
 
   std::string stringOfCPUFeatures(int features)
@@ -307,6 +183,7 @@ namespace embree
     if (features & CPU_FEATURE_AVX512VL) str += "AVX512VL ";
     if (features & CPU_FEATURE_AVX512IFMA) str += "AVX512IFMA ";
     if (features & CPU_FEATURE_AVX512VBMI) str += "AVX512VBMI ";
+    if (features & CPU_FEATURE_NEON) str += "NEON ";
     return str;
   }
   
@@ -323,6 +200,7 @@ namespace embree
     if (isa == AVX512KNL) return "AVX512KNL";
     if (isa == AVX512SKX) return "AVX512SKX";
     if (isa == KNC) return "KNC";
+    if (isa == NEON) return "NEON";
     return "UNKNOWN";
   }
 
@@ -345,6 +223,7 @@ namespace embree
     if (hasISA(features,AVX512KNL)) v += "AVX512KNL ";
     if (hasISA(features,AVX512SKX)) v += "AVX512SKX ";
     if (hasISA(features,KNC)) v += "KNC ";
+    if (hasISA(features,NEON)) v += "NEON";
     return v;
   }
 }

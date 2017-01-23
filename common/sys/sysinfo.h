@@ -72,8 +72,12 @@
 #  define isa sse
 #  define ISA SSE
 #  define ISA_STR "SSE"
-#else 
-#error Unknown ISA
+#elif defined(__ARM_NEON__)
+#define isa neon
+#define ISA NEON
+#define ISA_STR "NEON"
+#else
+//#error Unknown ISA
 #endif
 
 #if defined (__MACOSX__)
@@ -96,7 +100,8 @@ namespace embree
     CPU_CORE_SANDYBRIDGE,
     CPU_HASWELL,
     CPU_KNC,
-    CPU_KNL
+    CPU_KNL,
+    CPU_ARM
   };
 
   /*! get the full path to the running executable */
@@ -143,7 +148,7 @@ namespace embree
   static const int CPU_FEATURE_AVX512VL = 1 << 22;
   static const int CPU_FEATURE_AVX512IFMA = 1 << 23;
   static const int CPU_FEATURE_AVX512VBMI = 1 << 24;
- 
+  static const int CPU_FEATURE_NEON = 1 << 31; 
   /*! get CPU features */
   int getCPUFeatures();
 
@@ -166,6 +171,7 @@ namespace embree
   static const int AVX512KNL = AVX2 | CPU_FEATURE_AVX512F | CPU_FEATURE_AVX512PF | CPU_FEATURE_AVX512ER | CPU_FEATURE_AVX512CD;
   static const int AVX512SKX = AVX2 | CPU_FEATURE_AVX512F | CPU_FEATURE_AVX512DQ | CPU_FEATURE_AVX512CD | CPU_FEATURE_AVX512BW | CPU_FEATURE_AVX512VL;
   static const int KNC    = CPU_FEATURE_KNC;
+  static const int NEON   = CPU_FEATURE_NEON|CPU_FEATURE_SSE|CPU_FEATURE_SSE2;
 
   /*! converts ISA bitvector into a string */
   std::string stringOfISA(int features);

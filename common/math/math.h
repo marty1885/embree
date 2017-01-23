@@ -20,8 +20,9 @@
 #include "constants.h"
 #include <cmath>
 
-#include <emmintrin.h>
-#include <xmmintrin.h>
+//#include <emmintrin.h>
+//#include <xmmintrin.h>
+#include "./SSE2NEON.h"
 
 #if defined(__WIN32__)
 #if (__MSV_VER <= 1700)

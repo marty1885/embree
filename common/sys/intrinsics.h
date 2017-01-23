@@ -22,7 +22,8 @@
 #include <intrin.h>
 #endif
 
-#include <immintrin.h>
+//#include <immintrin.h>
+#include "SSE2NEON.h"
 
 #if defined(__BMI__) && defined(__GNUC__)
   #if !defined(_tzcnt_u32)
@@ -215,52 +216,44 @@ namespace embree
   }
   
 #else
-  
+
   __forceinline void __cpuid(int out[4], int op) {
-    asm volatile ("cpuid" : "=a"(out[0]), "=b"(out[1]), "=c"(out[2]), "=d"(out[3]) : "a"(op)); 
+    if(op == 0)//Get CPU Name
+    {
+    	
+	out[0] = 0x41524d20;
+	out[1] = 0x41524d20;
+	out[2] = 0x41524d20;
+	out[3] = 0x41524d20;
+    }
   }
-  
+/*  
   __forceinline void __cpuid_count(int out[4], int op1, int op2) {
     asm volatile ("cpuid" : "=a"(out[0]), "=b"(out[1]), "=c"(out[2]), "=d"(out[3]) : "a"(op1), "c"(op2)); 
   }
-  
+  */
 #endif
   
   __forceinline uint64_t read_tsc()  {
-    uint32_t high,low;
-    asm volatile ("rdtsc" : "=d"(high), "=a"(low));
-    return (((uint64_t)high) << 32) + (uint64_t)low;
+    //uint32_t high,low;
+    //asm volatile ("rdtsc" : "=d"(high), "=a"(low));
+    //return (((uint64_t)high) << 32) + (uint64_t)low;
+    return 0;
   }
   
   __forceinline int __bsf(int v) {
-#if defined(__AVX2__) 
-    return _tzcnt_u32(v);
-#else
-    int r = 0; asm ("bsf %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+	return __builtin_ctz(v);
   }
   
 #if defined(__X86_64__)
   __forceinline unsigned __bsf(unsigned v) 
   {
-#if defined(__AVX2__) 
-    return _tzcnt_u32(v);
-#else
-    unsigned r = 0; asm ("bsf %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+  	return __builtin_ctz(v);
   }
 #endif
   
   __forceinline size_t __bsf(size_t v) {
-#if defined(__AVX2__)
-#if defined(__X86_64__)
-    return _tzcnt_u64(v);
-#else
-    return _tzcnt_u32(v);
-#endif
-#else
-    size_t r = 0; asm ("bsf %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+  	return __builtin_ctzl(v);
   }
 
   __forceinline int __bscf(int& v) 
@@ -287,33 +280,17 @@ namespace embree
   }
   
   __forceinline int __bsr(int v) {
-#if defined(__AVX2__) 
-    return 31 - _lzcnt_u32(v);
-#else
-    int r = 0; asm ("bsr %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+  	return __builtin_clz(v)^31;
   }
   
 #if defined(__X86_64__)
   __forceinline unsigned __bsr(unsigned v) {
-#if defined(__AVX2__) 
-    return 31 - _lzcnt_u32(v);
-#else
-    unsigned r = 0; asm ("bsr %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+  	return __builtin_clz(v)^31;
   }
 #endif
   
   __forceinline size_t __bsr(size_t v) {
-#if defined(__AVX2__)
-#if defined(__X86_64__)
-    return 63 - _lzcnt_u64(v);
-#else
-    return 31 - _lzcnt_u32(v);
-#endif
-#else
-    size_t r = 0; asm ("bsr %1,%0" : "=r"(r) : "r"(v)); return r;
-#endif
+  	return sizeof(v)*8-1 - __builtin_clz(v);
   }
   
   __forceinline int lzcnt(const int x)
@@ -342,28 +319,46 @@ namespace embree
 #endif
   }
   
-  __forceinline int __btc(int v, int i) {
-    int r = 0; asm ("btc %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags" ); return r;
+  __forceinline int __btc(int& v, int i) {
+    unsigned int mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v ^= mask;
+    return r;
   }
   
   __forceinline int __bts(int v, int i) {
-    int r = 0; asm ("bts %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
+    unsigned int mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v |= mask;
+    return r;
   }
   
   __forceinline int __btr(int v, int i) {
-    int r = 0; asm ("btr %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
+    unsigned int mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v ^= ~mask;
+    return r;
   }
   
   __forceinline size_t __btc(size_t v, size_t i) {
-    size_t r = 0; asm ("btc %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags" ); return r;
+    size_t mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v ^= mask;
+    return r;
   }
   
   __forceinline size_t __bts(size_t v, size_t i) {
-    size_t r = 0; asm ("bts %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
+    size_t mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v |= mask;
+    return r;   
   }
   
   __forceinline size_t __btr(size_t v, size_t i) {
-    size_t r = 0; asm ("btr %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
+    size_t mask = 1<<i;
+    int r = (v&mask)?0xffffffff:0;
+    v &= ~mask;
+    return r; 
   }
 
   __forceinline int32_t atomic_cmpxchg( int32_t volatile* value, int32_t comparand, const int32_t input ) {
@@ -406,7 +401,7 @@ namespace embree
   __forceinline void __pause_cpu (const size_t N = 8) 
   {
     for (size_t i=0; i<N; i++)
-      _mm_pause();    
+      _mm_pause();
   }
   
   /* prefetches */

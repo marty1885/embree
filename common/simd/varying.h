@@ -79,13 +79,13 @@ namespace embree
 #endif
 
   /* Maximum supported varying size */
-#if defined(__AVX512F__)
+/*#if defined(__AVX512F__)
   const int VSIZEX = 16;
 #elif defined(__AVX__)
   const int VSIZEX = 8;
-#else
-  const int VSIZEX = 4;
-#endif
+#else*/
+  const int VSIZEX = 4;//NEON supports 4 way simd
+//#endif
 
   /* Extends varying size N to optimal or up to max(N, N2) */
   template<int N, int N2 = VSIZEX>
